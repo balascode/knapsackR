@@ -75,7 +75,7 @@ knapsack_dynamic <- function(x, W) {
   }
 
   list(
-    value = dp[n + 1, W + 1],
+    value = round(dp[n + 1, W + 1]),
     elements = elements
   )
 }

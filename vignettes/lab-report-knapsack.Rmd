@@ -1,19 +1,274 @@
 ---
-title: "lab-report-knapsack"
+title: "Lab Report: Knapsack Problem"
+author: "Venkata Balaji Anupoju and Marwan Karim"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{lab-report-knapsack}
+  %\VignetteIndexEntry{Lab Report Knapsack}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r, include = FALSE}
+```{r setup, include=FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
-```
 
-```{r setup}
 library(knapsackR)
 ```
+
+# Introduction
+
+The knapsack problem is an optimization problem where each object has a weight and a value. The goal is to select a set of objects with the highest possible total value without exceeding the maximum capacity of the knapsack.
+
+In this lab, we use three different approaches:
+
+- brute force,
+- dynamic programming,
+- greedy approximation.
+
+The three methods solve the same problem in different ways. Brute force and dynamic programming are exact methods, while the greedy algorithm is an approximation. Their computational complexity is also different, so their execution time changes significantly when the number of objects becomes larger.
+
+# Reproducible data
+
+The following code is provided in the lab instructions and is used to generate the objects for the experiments.
+
+```{r create-data}
+RNGversion(min(as.character(getRversion()), "3.5.3"))
+
+set.seed(
+  42,
+  kind = "Mersenne-Twister",
+  normal.kind = "Inversion"
+)
+
+n <- 2000
+
+knapsack_objects <- data.frame(
+  w = sample(1:4000, size = n, replace = TRUE),
+  v = runif(n = n, 0, 10000)
+)
+
+head(knapsack_objects)
+```
+
+The column `w` represents the weight of an object and the column `v` represents its value.
+
+Using the same random number generator settings and seed makes the data reproducible. This means that the same code can generate the same sequence of objects again.
+
+When we write:
+
+```r
+knapsack_objects[1:8, ]
+```
+
+the expression before the comma selects rows 1 to 8, while the empty position after the comma means that all columns are kept.
+
+# Brute force
+
+## Method
+
+The brute force method checks every possible subset of the available objects.
+
+For `n` objects, there are \(2^n\) possible subsets. Each subset is checked to see whether its total weight is less than or equal to the knapsack capacity. If the subset is valid, its total value is calculated. The algorithm keeps the valid subset with the highest value.
+
+Because the number of subsets doubles when one more object is added, the computational complexity grows approximately as:
+
+\[
+O(2^n)
+\]
+
+This makes brute force exact, but very expensive when `n` becomes large.
+
+## Example from the lab
+
+```{r brute-example-3500}
+brute_force_knapsack(
+  x = knapsack_objects[1:8, ],
+  W = 3500
+)
+```
+
+For this example, the optimal solution uses objects 5 and 8 and gives a rounded maximum value of 16770.
+
+```{r brute-example-2000}
+brute_force_knapsack(
+  x = knapsack_objects[1:8, ],
+  W = 2000
+)
+```
+
+For this case, the optimal solution uses objects 3 and 8 and gives a rounded maximum value of 15428.
+
+These results should agree with the dynamic programming solution because both methods are exact.
+
+## Execution time for 16 objects
+
+The lab asks us to measure the brute force execution time for 16 objects.
+
+```{r brute-time}
+brute_time <- system.time(
+  brute_result <- brute_force_knapsack(
+    x = knapsack_objects[1:16, ],
+    W = 3500
+  )
+)
+
+brute_time
+```
+
+The exact time can vary between computers and between runs. The important observation is that brute force becomes expensive quickly because the number of subsets grows exponentially.
+
+# Dynamic programming
+
+## Method
+
+The dynamic programming method solves the knapsack problem by storing solutions to smaller subproblems and reusing them.
+
+For every object and every possible capacity, the algorithm stores the best value that can be achieved.
+
+For each object, there are two choices:
+
+1. do not include the object,
+2. include the object if it fits.
+
+If the object is included, its value is added to the best previously calculated value for the remaining capacity. The larger of the two choices is stored in the dynamic programming table.
+
+After the table is complete, the algorithm works backwards through the table to identify the selected object indices.
+
+The computational complexity is approximately:
+
+\[
+O(nW)
+\]
+
+where `n` is the number of objects and `W` is the maximum knapsack capacity.
+
+## Example from the lab
+
+```{r dynamic-example-3500}
+knapsack_dynamic(
+  x = knapsack_objects[1:8, ],
+  W = 3500
+)
+```
+
+The selected objects are 5 and 8, with a rounded maximum value of 16770.
+
+```{r dynamic-example-2000}
+knapsack_dynamic(
+  x = knapsack_objects[1:8, ],
+  W = 2000
+)
+```
+
+The selected objects are 3 and 8, with a rounded maximum value of 15428.
+
+These results agree with the brute force solution.
+
+## Execution time for 500 objects
+
+The lab asks us to measure the dynamic programming execution time for 500 objects.
+
+```{r dynamic-time}
+dynamic_time <- system.time(
+  dynamic_result <- knapsack_dynamic(
+    x = knapsack_objects[1:500, ],
+    W = 3500
+  )
+)
+
+dynamic_time
+```
+
+In our local tests, the elapsed time was around a few seconds for 500 objects. The exact value can vary slightly between runs because it depends on the computer and the operating system.
+
+Compared with brute force, dynamic programming is much more practical for larger values of `n` because it avoids checking every possible subset.
+
+# Greedy algorithm
+
+## Method
+
+The greedy algorithm is an approximation method.
+
+The implementation ranks objects according to how much value they provide relative to their weight. The objects are then considered in that order and added to the knapsack when they fit.
+
+The method is fast because it does not search through every possible combination. However, it is not guaranteed to find the exact optimal solution.
+
+The most expensive step is sorting the objects, so the expected computational complexity is approximately:
+
+\[
+O(n \log n)
+\]
+
+## Execution time for one million objects
+
+The lab asks us to measure the greedy algorithm for 1,000,000 objects.
+
+```{r greedy-data, eval=FALSE}
+RNGversion(min(as.character(getRversion()), "3.5.3"))
+
+set.seed(
+  42,
+  kind = "Mersenne-Twister",
+  normal.kind = "Inversion"
+)
+
+n_greedy <- 1000000
+
+greedy_objects <- data.frame(
+  w = sample(1:4000, size = n_greedy, replace = TRUE),
+  v = runif(n = n_greedy, 0, 10000)
+)
+```
+
+The timing is measured using:
+
+```{r greedy-time, eval=FALSE}
+greedy_time <- system.time(
+  greedy_result <- greedy_knapsack(
+    x = greedy_objects,
+    W = 3500
+  )
+)
+
+greedy_time
+```
+
+In our local benchmark, the elapsed time was approximately 1.10 seconds for 1,000,000 objects.
+
+This demonstrates why the greedy method is useful for very large inputs. It can process many more objects than brute force in a short amount of time, but the result is approximate rather than guaranteed to be optimal.
+
+# Comparison of the algorithms
+
+The three methods have different trade-offs.
+
+| Algorithm | Exact solution | Approximate complexity | Required timing size |
+|---|---|---|---:|
+| Brute force | Yes | \(O(2^n)\) | `n = 16` |
+| Dynamic programming | Yes | \(O(nW)\) | `n = 500` |
+| Greedy | No | \(O(n \log n)\) | `n = 1,000,000` |
+
+Brute force gives an exact result, but its running time increases very quickly as the number of objects increases.
+
+Dynamic programming is also exact, but it reuses previously calculated results instead of trying every subset. This makes it much more efficient for larger inputs.
+
+The greedy method is the fastest of the three for large inputs, but it may return a solution that is lower than the true optimum.
+
+# Profiling and optimization
+
+This section will be completed after profiling the implementations with `profvis`.
+
+The goal of profiling is to identify which parts of the code use the most execution time. After identifying a bottleneck, we will improve the implementation, rerun the tests to make sure the result is still correct, and compare the execution time before and after the change.
+
+# Starred exercise
+
+The starred exercise and its performance comparison will be added after it has been completed.
+
+# Conclusion
+
+The current results show that the choice of algorithm has a major effect on performance.
+
+Brute force is exact but becomes impractical quickly because the number of possible subsets grows exponentially. Dynamic programming is also exact and can solve much larger problems by storing and reusing smaller results. The greedy method is much faster for very large inputs, but it does not guarantee the optimal solution.
+
+The final report will be completed after profiling, optimization, and the starred exercise have been finished.

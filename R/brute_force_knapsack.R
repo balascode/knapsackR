@@ -46,22 +46,35 @@ brute_force_knapsack <- function(x, W) {
     )
   }
 
+  weights <- x$w
+  values <- x$v
+
+  masks <- bitwShiftL(
+    1L,
+    0:(n - 1)
+  )
+
   best_value <- 0
   best_elements <- integer()
 
   for (subset_id in 0:(2^n - 1)) {
 
-    selected <- as.logical(
-      as.integer(intToBits(subset_id))[seq_len(n)]
-    )
+    selected <-
+      bitwAnd(
+        as.integer(subset_id),
+        masks
+      ) != 0L
 
-    total_weight <- sum(x$w[selected])
+    total_weight <-
+      sum(weights[selected])
 
     if (total_weight <= W) {
 
-      total_value <- sum(x$v[selected])
+      total_value <-
+        sum(values[selected])
 
       if (total_value > best_value) {
+
         best_value <- total_value
         best_elements <- which(selected)
       }

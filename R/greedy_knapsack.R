@@ -1,3 +1,4 @@
+
 #' Solve the knapsack problem using a greedy heuristic
 #'
 #' Finds an approximate solution to the knapsack problem by
@@ -31,25 +32,38 @@ greedy_knapsack <- function(x, W) {
     stop("W must be a single positive numeric value.")
   }
 
+  # Extract columns once to reduce repeated access
+  weights <- x$w
+  values <- x$v
+
   # Sort items by their value-to-weight ratio
-  ratio <- x$v / x$w
+  ratio <- values / weights
   order_items <- order(ratio, decreasing = TRUE)
 
   total_weight <- 0
   total_value <- 0
-  elements <- integer()
+
+  # Preallocate memory for selected items
+  elements <- integer(nrow(x))
+  count <- 0L
 
   # Add items as long as they fit
   for (i in order_items) {
 
-    if (total_weight + x$w[i] <= W) {
+    item_weight <- weights[i]
 
-      total_weight <- total_weight + x$w[i]
-      total_value <- total_value + x$v[i]
+    if (total_weight + item_weight <= W) {
 
-      elements <- c(elements, i)
+      total_weight <- total_weight + item_weight
+      total_value <- total_value + values[i]
+
+      count <- count + 1L
+      elements[count] <- i
     }
   }
+
+  # Keep only the selected items
+  elements <- elements[seq_len(count)]
 
   list(
     value = total_value,

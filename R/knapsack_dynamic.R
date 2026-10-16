@@ -46,17 +46,25 @@ knapsack_dynamic <- function(x, W) {
     item_weight <- x$w[i]
     item_value <- x$v[i]
 
-    for (capacity in 0:W) {
+    previous_row <- dp[i, ]
+    current_row <- previous_row
 
-      if (item_weight > capacity) {
-        dp[i + 1, capacity + 1] <- dp[i, capacity + 1]
-      }
-      else {
-        without_item <- dp[i, capacity + 1]
-        with_item <- item_value + dp[i, capacity - item_weight + 1]
-        dp[i + 1, capacity + 1] <- max(without_item, with_item)
-      }
+    if (item_weight <= W) {
+
+      capacities <- item_weight:W
+
+      without_item <-
+        previous_row[capacities + 1]
+
+      with_item <-
+        item_value +
+        previous_row[capacities - item_weight + 1]
+
+      current_row[capacities + 1] <-
+        pmax(without_item, with_item)
     }
+
+    dp[i + 1, ] <- current_row
   }
 
   elements <- integer()

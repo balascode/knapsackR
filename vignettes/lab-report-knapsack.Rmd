@@ -168,7 +168,11 @@ These results agree with the brute force solution.
 
 ## Execution time for 500 objects
 
-The lab asks us to measure the dynamic programming execution time for 500 objects.
+The lab asks us to investigate the execution time of the dynamic programming
+algorithm when 500 objects are used.
+
+We use the first 500 objects from the reproducible data set and a knapsack
+capacity of 3500.
 
 ```{r dynamic-time}
 dynamic_time <- system.time(
@@ -181,9 +185,444 @@ dynamic_time <- system.time(
 dynamic_time
 ```
 
-In our local tests, the elapsed time was around a few seconds for 500 objects. The exact value can vary slightly between runs because it depends on the computer and the operating system.
+The `system.time()` function reports three different values: `user`, `system`,
+and `elapsed`. In this report, we mainly use the `elapsed` value because it
+represents the actual amount of time that passed while the function was
+running.
 
-Compared with brute force, dynamic programming is much more practical for larger values of `n` because it avoids checking every possible subset.
+After optimization, the dynamic programming implementation takes only a small
+fraction of a second for 500 objects on our machine.
+
+Because such short execution times can vary slightly between runs, we also
+measured the optimized implementation ten times.
+
+```{r dynamic-repeated-time}
+optimized_times <- replicate(
+  10,
+  system.time(
+    knapsack_dynamic(
+      x = knapsack_objects[1:500, ],
+      W = 3500
+    )
+  )[["elapsed"]]
+)
+
+optimized_times
+mean(optimized_times)
+median(optimized_times)
+```
+
+The ten measured elapsed times were approximately between 0.03 and 0.05
+seconds. The mean elapsed time was approximately 0.047 seconds and the median
+was approximately 0.05 seconds.
+
+The dynamic programming algorithm is still an exact algorithm with
+computational complexity approximately \(O(nW)\), where `n` is the number of
+objects and `W` is the maximum capacity of the knapsack.
+
+The optimization described in the next section does not change this
+theoretical complexity. Instead, it makes the R implementation much more
+efficient.
+
+# Profiling and optimization
+
+## Why we used profiling
+
+Measuring the total execution time tells us how long a function takes, but it
+does not tell us which part of the function is responsible for most of that
+time.
+
+For this reason, we used the `profvis` package to profile the dynamic
+programming implementation.
+
+Profiling allows us to see where the program spends its execution time and
+helps us identify possible bottlenecks.
+
+The original implementation was profiled using the following command:
+
+```{r profiling-command, eval=FALSE}
+profvis::profvis({
+  knapsack_dynamic(
+    x = knapsack_objects[1:500, ],
+    W = 3500
+  )
+})
+```
+
+Before making any changes, the dynamic programming implementation took
+approximately 2.83 seconds of elapsed time for 500 objects and a capacity of
+3500.
+
+## Bottleneck in the original implementation
+
+The original implementation used two nested loops.
+
+The outer loop processed every object, while the inner loop processed every
+possible capacity from 0 to `W`.
+
+The main part of the original implementation had the following structure:
+
+```{r original-dynamic-code, eval=FALSE}
+for (i in seq_len(n)) {
+
+  item_weight <- x$w[i]
+  item_value <- x$v[i]
+
+  for (capacity in 0:W) {
+
+    if (item_weight > capacity) {
+
+      dp[i + 1, capacity + 1] <-
+        dp[i, capacity + 1]
+
+    } else {
+
+      without_item <-
+        dp[i, capacity + 1]
+
+      with_item <-
+        item_value +
+        dp[i, capacity - item_weight + 1]
+
+      dp[i + 1, capacity + 1] <-
+        max(without_item, with_item)
+    }
+  }
+}
+```
+
+For 500 objects and `W = 3500`, the inner loop can execute approximately
+
+\[
+500 \times 3501 = 1,750,500
+\]
+
+times.
+
+The profiling result showed that most of the execution time was spent inside
+this inner capacity loop.
+
+A large amount of work was caused by repeatedly reading individual values from
+the dynamic programming matrix, comparing them, and then writing individual
+values back into the matrix.
+
+The algorithm itself was correct, but performing around 1.75 million small
+operations through an interpreted R loop was relatively expensive.
+
+This was therefore identified as the main bottleneck.
+
+## Optimization using vectorization
+
+To improve the performance, we removed the inner loop over every individual
+capacity.
+
+The outer loop over the objects is still required. However, instead of
+processing one capacity at a time, the optimized implementation processes all
+capacities where the current object can fit as a vector.
+
+The optimized part of the implementation is:
+
+```{r optimized-dynamic-code, eval=FALSE}
+for (i in seq_len(n)) {
+
+  item_weight <- x$w[i]
+  item_value <- x$v[i]
+
+  previous_row <- dp[i, ]
+  current_row <- previous_row
+
+  if (item_weight <= W) {
+
+    capacities <- item_weight:W
+
+    without_item <-
+      previous_row[capacities + 1]
+
+    with_item <-
+      item_value +
+      previous_row[capacities - item_weight + 1]
+
+    current_row[capacities + 1] <-
+      pmax(without_item, with_item)
+  }
+
+  dp[i + 1, ] <- current_row
+}
+```
+
+The basic dynamic programming idea is exactly the same as before.
+
+For every possible capacity, the algorithm still compares two alternatives:
+
+1. do not include the current object,
+2. include the current object if it fits.
+
+The difference is how these calculations are performed in R.
+
+In the original version, the program calculated one capacity at a time.
+
+In the optimized version, all valid capacities for one object are handled
+together.
+
+For example, if an object has weight 3 and the knapsack capacity is 5, the
+valid capacities for that object are:
+
+```r
+3:5
+```
+
+which gives:
+
+```text
+3 4 5
+```
+
+Instead of running three separate iterations, the optimized code calculates
+the values for capacities 3, 4, and 5 together.
+
+The vector
+
+```r
+without_item
+```
+
+contains the best values obtained without selecting the current object.
+
+The vector
+
+```r
+with_item
+```
+
+contains the values obtained by selecting the current object and adding its
+value to the best solution for the remaining capacity.
+
+The function
+
+```r
+pmax(without_item, with_item)
+```
+
+then performs an element-wise comparison between the two vectors.
+
+For example, if:
+
+```text
+without_item = 1 1 1
+with_item    = 4 5 5
+```
+
+then:
+
+```r
+pmax(without_item, with_item)
+```
+
+returns:
+
+```text
+4 5 5
+```
+
+This is the same decision that the original nested loop made, but it is
+performed on a complete vector instead of one element at a time.
+
+Vector operations are implemented efficiently inside R, which greatly reduces
+the overhead caused by the original inner R loop.
+
+## Performance before and after optimization
+
+Before the optimization, the elapsed execution time for 500 objects and
+`W = 3500` was approximately:
+
+```text
+2.83 seconds
+```
+
+After replacing the inner capacity loop with vectorized calculations, a
+comparable execution took approximately:
+
+```text
+0.07 seconds
+```
+
+The speedup can be calculated as:
+
+\[
+\text{Speedup} =
+\frac{\text{original time}}
+{\text{optimized time}}
+\]
+
+For our measurements:
+
+\[
+\frac{2.83}{0.07}
+\approx 40.43
+\]
+
+Therefore, in this comparison, the optimized implementation was approximately
+40 times faster than the original implementation.
+
+We can also calculate the percentage reduction in elapsed execution time:
+
+\[
+\frac{2.83 - 0.07}{2.83} \times 100
+\approx 97.53\%
+\]
+
+This corresponds to an elapsed-time reduction of approximately 97.5%.
+
+Because a single timing measurement can vary slightly, we also executed the
+optimized implementation ten times.
+
+The measured elapsed times were:
+
+```text
+0.05 0.05 0.05 0.05 0.03 0.05 0.05 0.04 0.05 0.05
+```
+
+The mean elapsed time was:
+
+```text
+0.047 seconds
+```
+
+and the median elapsed time was:
+
+```text
+0.05 seconds
+```
+
+These repeated measurements confirm that the optimized implementation is
+consistently much faster than the original implementation.
+
+## Profiling the optimized implementation
+
+We also profiled the optimized version.
+
+A single optimized execution became so fast that `profvis` only received a
+small number of samples. To obtain a more useful profiling view, we repeated
+the same 500-object call 20 times inside the profiler.
+
+```{r optimized-profiling-command, eval=FALSE}
+profvis::profvis({
+
+  for (repeat_id in 1:20) {
+
+    knapsack_dynamic(
+      x = knapsack_objects[1:500, ],
+      W = 3500
+    )
+  }
+
+})
+```
+
+The second profile showed that the large inner capacity loop from the original
+implementation was no longer present.
+
+The remaining execution time was mainly associated with vector operations,
+including indexing the previous row, calculating the vectors for the two
+possible choices, using `pmax()`, writing the completed row back into the
+dynamic programming matrix, and memory management.
+
+This was expected because these operations now perform the work that was
+previously carried out through many individual loop iterations.
+
+## Computational complexity after optimization
+
+It is important to note that the optimization does not change the theoretical
+computational complexity of the dynamic programming algorithm.
+
+The original implementation had complexity approximately:
+
+\[
+O(nW)
+\]
+
+and the optimized implementation also has complexity approximately:
+
+\[
+O(nW)
+\]
+
+The same number of dynamic programming states must still be considered.
+
+The improvement comes from changing how these states are processed in R.
+
+The original implementation performed the capacity calculations one at a
+time using an interpreted inner loop. The optimized implementation processes
+many capacities together using vector operations.
+
+Therefore, the mathematical algorithm has not changed, but the implementation
+has become much more efficient.
+
+## Verifying correctness after optimization
+
+Performance improvements are only useful if the optimized implementation
+still produces the correct result.
+
+After replacing the inner loop with vectorized calculations, we first compared
+the old and optimized implementations on a small example.
+
+Both implementations returned:
+
+```text
+value = 6
+elements = 1 3
+```
+
+We then tested the optimized implementation using the examples from the lab.
+
+For the first eight objects with `W = 3500`, the optimized implementation
+returned:
+
+```text
+value = 16770
+elements = 5 8
+```
+
+For the first eight objects with `W = 2000`, it returned:
+
+```text
+value = 15428
+elements = 3 8
+```
+
+These results are the same as before the optimization.
+
+Finally, we reran the complete test suite and the package check.
+
+The tests completed without failures, and `R CMD check` completed with:
+
+```text
+0 errors
+0 warnings
+0 notes
+```
+
+This confirms that the optimization improved the execution speed without
+changing the expected behaviour of the dynamic programming function.
+
+## Summary of the optimization
+
+The profiling and optimization process can be summarized as follows:
+
+1. The original implementation was measured before optimization.
+2. `profvis` was used to identify where most of the execution time was spent.
+3. The inner loop over every capacity was identified as the main bottleneck.
+4. The inner loop was replaced with vectorized calculations.
+5. The optimized implementation was tested to make sure the results were still correct.
+6. The runtime was measured again.
+7. The optimized implementation was approximately 40 times faster in the direct before-and-after comparison.
+8. Repeated measurements showed an optimized mean elapsed time of approximately 0.047 seconds.
+9. The theoretical complexity remained \(O(nW)\).
+10. All tests and package checks still passed after the optimization.
+
+The profiling results show that implementation details can have a very large
+effect on performance even when the underlying algorithm and its theoretical
+complexity remain unchanged.
 
 # Greedy algorithm
 

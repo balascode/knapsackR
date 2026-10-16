@@ -17,6 +17,14 @@ A list with:
 \item{value}{The maximum total value, rounded to the nearest integer.}
 \item{elements}{The row numbers of the selected items.}
 }
+
+#' @examples
+x <- data.frame(
+w = c(1, 3, 4),
+v = c(1, 4, 5)
+)
+
+brute_force_knapsack(x, W = 5)
 }
 \description{
 Finds the exact maximum value that can be placed in a knapsack

@@ -1,5 +1,5 @@
-
 # knapsackR
+[![R-CMD-check](https://github.com/balascode/knapsackR/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/balascode/knapsackR/actions/workflows/R-CMD-check.yaml)
 
 This is an R package implementing three algorithms for solving the 0/1 Knapsack Problem.
 

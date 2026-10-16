@@ -3,7 +3,7 @@ title: "Lab Report: Knapsack Problem"
 author: "Venkata Balaji Anupoju and Marwan Karim"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Lab Report Knapsack}
+  %\VignetteIndexEntry{Lab Report: Knapsack Problem}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -19,25 +19,34 @@ library(knapsackR)
 
 # Introduction
 
-The knapsack problem is an optimization problem where each object has a weight and a value. The goal is to select a set of objects with the highest possible total value without exceeding the maximum capacity of the knapsack.
+The knapsack problem is an optimization problem where every object has a
+weight and a value. The goal is to choose a set of objects with the highest
+possible total value without exceeding the maximum weight that the knapsack
+can carry.
 
-In this lab, we study three different approaches:
+In this lab, we implemented and studied three different approaches:
 
 - brute force,
 - dynamic programming,
 - greedy approximation.
 
-Brute force and dynamic programming are exact methods. This means that they are designed to return the optimal solution.
+Brute force and dynamic programming are exact algorithms. They are designed to
+find the optimal solution.
 
-The greedy method is an approximation. It is much faster for large inputs, but it is not guaranteed to return the optimal solution.
+The greedy algorithm is an approximation. It is much faster for large inputs,
+but it is not guaranteed to return the optimal solution.
 
-The purpose of this lab is not only to implement the three algorithms, but also to study how their execution time changes as the input becomes larger.
+The main purpose of the lab was to compare how these algorithms behave as the
+problem size grows. We therefore studied both their theoretical computational
+complexity and their practical execution time.
 
-We also use profiling to identify slow parts of the implementations and improve them without changing the underlying algorithm.
+We also used `profvis` to identify performance bottlenecks and improve the R
+implementations without changing the underlying algorithm.
 
 # Reproducible data
 
-The following code is provided in the lab instructions and is used to generate the objects for the experiments.
+The following code was provided in the lab instructions and is used to
+generate the objects for the experiments.
 
 ```{r create-data}
 RNGversion(
@@ -71,62 +80,84 @@ knapsack_objects <- data.frame(
 head(knapsack_objects)
 ```
 
-The column `w` represents the weight of an object and the column `v` represents its value.
+The column `w` contains the object weights and the column `v` contains the
+object values.
 
-Using the same random number generator settings and the same seed makes the data reproducible. This means that the same code can generate the same sequence of objects again.
+The fixed random seed and random-number-generator settings make the experiment
+reproducible.
 
-When we write:
+For example:
 
 ```r
 knapsack_objects[1:8, ]
 ```
 
-the expression before the comma selects rows 1 to 8, while the empty position after the comma means that all columns are kept.
+selects the first eight rows and keeps all columns.
 
-Therefore:
+Similarly:
 
 ```r
 knapsack_objects[1:500, ]
 ```
 
-means that the first 500 objects are selected while both the weight and value columns are kept.
+selects the first 500 objects.
+
+# Measuring execution time and profiling
+
+Two different tools were used when studying performance.
+
+`system.time()` measures how long a complete expression takes to execute.
+
+The `elapsed` value is used in this report because it represents the actual
+wall-clock time.
+
+For more reliable comparisons, important before-and-after measurements were
+repeated ten times.
+
+`profvis`, on the other hand, was used to answer a different question:
+
+> Which parts of the implementation are responsible for the execution time?
+
+This distinction is important. Timing tells us **how long** a function takes,
+while profiling helps explain **why** it takes that long.
 
 # Brute force
 
 ## Method
 
-The brute force algorithm solves the knapsack problem by checking every possible subset of the available objects.
+The brute force algorithm checks every possible subset of the available
+objects.
 
-Each object has two possibilities:
+For each object there are two possibilities:
 
-1. the object is selected,
-2. the object is not selected.
+1. select the object,
+2. do not select the object.
 
-Therefore, for `n` objects, the total number of possible subsets is:
+Therefore, with `n` objects there are:
 
 \[
 2^n
 \]
 
-For every subset, the algorithm calculates the total weight.
+possible subsets.
 
-If the total weight is less than or equal to the knapsack capacity, the subset is valid. The total value of that subset is then calculated.
+For each subset, the algorithm calculates its total weight. If the weight does
+not exceed the knapsack capacity, the total value is calculated. The valid
+subset with the highest value is kept as the best solution.
 
-The algorithm keeps the valid subset with the highest value.
+Because every possible subset is examined, brute force is an exact algorithm.
 
-Because every possible subset is checked, brute force gives an exact solution.
-
-Its computational complexity is approximately:
+Its computational complexity is:
 
 \[
 O(2^n)
 \]
 
-This means that the amount of work grows exponentially when the number of objects increases.
+The exponential growth makes brute force impractical for large values of `n`.
 
 ## Correctness examples
 
-The first example uses the first eight objects and a knapsack capacity of 3500.
+Using the first eight objects with a capacity of 3500:
 
 ```{r brute-example-3500}
 brute_force_knapsack(
@@ -135,16 +166,14 @@ brute_force_knapsack(
 )
 ```
 
-The result is:
+The expected result is:
 
 ```text
 value = 16770
 elements = 5 8
 ```
 
-This means that objects 5 and 8 form the optimal solution for this input.
-
-We can also test the function with a smaller capacity.
+Using the same objects with a smaller capacity:
 
 ```{r brute-example-2000}
 brute_force_knapsack(
@@ -153,31 +182,29 @@ brute_force_knapsack(
 )
 ```
 
-The result is:
+The expected result is:
 
 ```text
 value = 15428
 elements = 3 8
 ```
 
-These results agree with the dynamic programming solution because both algorithms are exact.
+These results also agree with the dynamic programming solution.
 
-## Required execution-time experiment
+## Required experiment: 16 objects
 
-The lab asks us to measure the execution time of brute force for 16 objects.
+The lab asks us to investigate the execution time for 16 objects.
 
-```{r brute-time}
-brute_time <- system.time(
-  brute_result <- brute_force_knapsack(
+```{r brute-required-time}
+system.time(
+  brute_force_knapsack(
     x = knapsack_objects[1:16, ],
     W = 3500
   )
 )
-
-brute_time
 ```
 
-For `n = 16`, brute force has to consider:
+With 16 objects, the algorithm must consider:
 
 \[
 2^{16} = 65,536
@@ -185,13 +212,12 @@ For `n = 16`, brute force has to consider:
 
 possible subsets.
 
-The exact execution time can vary slightly depending on the computer and other processes running at the same time.
+This is still manageable, but the number grows very quickly as `n` increases.
 
 ## Profiling the original implementation
 
-After confirming that the brute force implementation returned the correct results, we used `profvis` to investigate where most of the execution time was being spent.
-
-The original implementation generated the selected objects for every subset using:
+The original implementation represented each subset by converting the subset
+number into bits:
 
 ```r
 selected <- as.logical(
@@ -201,44 +227,31 @@ selected <- as.logical(
 )
 ```
 
-This converts the subset number into a logical vector.
-
-For example:
-
-```text
-TRUE FALSE TRUE
-```
-
-means that object 1 and object 3 are selected.
-
-The original implementation then calculated the total weight using:
+The selected weights were then calculated using:
 
 ```r
-total_weight <-
-  sum(
-    x$w[selected]
-  )
+total_weight <- sum(
+  x$w[selected]
+)
 ```
 
-We profiled the original function using:
+Profiling showed that a noticeable amount of time was spent repeatedly:
 
-```{r original-brute-profile, eval=FALSE}
-profvis::profvis({
-  brute_force_knapsack(
-    x = knapsack_objects[1:16, ],
-    W = 3500
-  )
-})
-```
+- converting subset numbers with `intToBits()`,
+- accessing data-frame columns,
+- calculating subset weights.
 
-Because one execution was short, we also repeated the same function ten times to collect more profiling samples.
+These operations occur inside a loop that is executed once for every possible
+subset.
 
-```{r repeated-original-brute-profile, eval=FALSE}
+The original version was profiled with:
+
+```{r brute-original-profile, eval=FALSE}
 profvis::profvis({
 
   for (repeat_id in 1:10) {
 
-    brute_force_knapsack(
+    brute_force_original(
       x = knapsack_objects[1:16, ],
       W = 3500
     )
@@ -247,35 +260,18 @@ profvis::profvis({
 })
 ```
 
-The profiler showed that a significant amount of execution time was spent in two areas:
-
-- converting each subset using `intToBits()`,
-- calculating the total weight of the selected objects.
-
-Both operations are repeated for every possible subset.
-
-For `n = 16`, this means that these operations may be repeated more than 65,000 times.
-
 ## Optimization
 
 The brute force strategy itself was not changed.
 
-The optimized implementation still examines every possible subset.
-
-Instead, we reduced the amount of repeated work inside the main loop.
-
-First, the weight and value columns were extracted before the loop:
+The first improvement was to extract the columns before the loop:
 
 ```r
 weights <- x$w
 values <- x$v
 ```
 
-This avoids repeatedly accessing the data frame columns.
-
-Next, repeated calls to `intToBits()` were replaced with reusable bit masks.
-
-The masks are created once using:
+The second improvement was to create reusable bit masks:
 
 ```r
 masks <- bitwShiftL(
@@ -284,15 +280,7 @@ masks <- bitwShiftL(
 )
 ```
 
-For three objects, these masks conceptually represent:
-
-```text
-001
-010
-100
-```
-
-The selected objects for each subset can then be identified directly using:
+The selected objects can then be identified with:
 
 ```r
 selected <-
@@ -302,13 +290,21 @@ selected <-
   ) != 0L
 ```
 
-For example, a subset represented by:
+For example, with three objects the masks conceptually represent:
+
+```text
+001
+010
+100
+```
+
+If the current subset is:
 
 ```text
 101
 ```
 
-produces:
+the logical selection becomes:
 
 ```text
 TRUE FALSE TRUE
@@ -316,111 +312,64 @@ TRUE FALSE TRUE
 
 which means that objects 1 and 3 are selected.
 
-The optimized core of the implementation is:
-
-```{r optimized-brute-code, eval=FALSE}
-weights <- x$w
-values <- x$v
-
-masks <- bitwShiftL(
-  1L,
-  0:(n - 1)
-)
-
-best_value <- 0
-best_elements <- integer()
-
-for (subset_id in 0:(2^n - 1)) {
-
-  selected <-
-    bitwAnd(
-      as.integer(subset_id),
-      masks
-    ) != 0L
-
-  total_weight <-
-    sum(
-      weights[selected]
-    )
-
-  if (total_weight <= W) {
-
-    total_value <-
-      sum(
-        values[selected]
-      )
-
-    if (total_value > best_value) {
-
-      best_value <- total_value
-      best_elements <- which(selected)
-    }
-  }
-}
-```
-
-The mathematical algorithm is still brute force.
-
-Every possible subset is still examined.
-
-The optimization only reduces the amount of work performed for each subset.
+The important point is that the algorithm still checks all \(2^n\) subsets.
+Only the work performed for each subset has been reduced.
 
 ## Performance before and after optimization
 
-We compared the original and optimized brute force implementations using 16 objects and a knapsack capacity of 3500.
+Both implementations were measured ten times using the same 16 objects and a
+capacity of 3500.
 
-The results were:
+The measured times were:
+
+```text
+Original:
+0.11 0.08 0.22 0.28 0.26
+0.28 0.23 0.29 0.28 0.18
+
+Optimized:
+0.04 0.04 0.05 0.05 0.04
+0.05 0.05 0.05 0.05 0.05
+```
+
+The summary is:
 
 | Measurement | Original | Optimized |
 |---|---:|---:|
-| Direct elapsed time | 0.14 s | 0.05 s |
-| Mean elapsed time over 10 runs | Not recorded | 0.081 s |
-| Median elapsed time over 10 runs | Not recorded | 0.080 s |
+| Mean elapsed time | 0.221 s | 0.047 s |
+| Median elapsed time | 0.245 s | 0.050 s |
+| Fastest run | 0.080 s | 0.040 s |
+| Slowest run | 0.290 s | 0.050 s |
 
-The direct speedup was calculated as:
+Using the mean execution times:
 
 \[
 \text{Speedup}
 =
-\frac{0.14}{0.05}
-=
-2.8
+\frac{0.221}{0.047}
+\approx
+4.70
 \]
 
-Therefore, the optimized implementation was approximately **2.8 times faster** in this direct comparison.
+The optimized version was therefore approximately **4.70 times faster on
+average** in this benchmark.
 
-Because the execution time is very short, individual runs can vary slightly.
+The reduction in mean elapsed time was:
 
-For this reason, the optimized implementation was also measured ten times.
+\[
+\frac{0.221 - 0.047}{0.221}
+\times 100
+\approx
+78.73\%
+\]
 
-The optimized elapsed times were:
+So the measured mean execution time was reduced by approximately **78.73%**.
 
-```text
-0.08 0.08 0.08 0.08 0.08
-0.09 0.08 0.07 0.08 0.09
-```
+## Profiling after optimization
 
-The mean optimized elapsed time was:
+The optimized function was profiled again:
 
-```text
-0.081 seconds
-```
-
-and the median optimized elapsed time was:
-
-```text
-0.080 seconds
-```
-
-These repeated measurements show that the optimized brute force implementation consistently runs in well under one tenth of a second for the required `n = 16` experiment.
-
-## Profiling the optimized implementation
-
-The optimized version was also profiled.
-
-Because one execution is short, the function was repeated ten times.
-
-```{r optimized-brute-profile, eval=FALSE}
+```{r brute-optimized-profile, eval=FALSE}
 profvis::profvis({
 
   for (repeat_id in 1:10) {
@@ -434,100 +383,64 @@ profvis::profvis({
 })
 ```
 
-The optimized profile showed that the repeated `intToBits()` conversion was no longer present.
+The repeated `intToBits()` conversion was no longer present.
 
-The remaining execution time was mainly associated with:
+The remaining work mainly involved:
 
-- the bitwise selection operation,
+- bitwise subset selection,
 - calculating subset weights,
-- checking whether the subset fits within the capacity.
+- checking whether a subset fits.
 
-These operations are still necessary because every possible subset must still be examined.
+These operations are unavoidable as long as every subset is examined.
 
-## Verifying correctness after optimization
+## Correctness and complexity after optimization
 
-The optimized implementation was compared with the original results.
+The optimized implementation returned the same results as the original
+implementation for the lab examples.
 
-For `W = 3500`, both versions returned:
+For `W = 3500`:
 
 ```text
 value = 16770
 elements = 5 8
 ```
 
-For `W = 2000`, both versions returned:
+For `W = 2000`:
 
 ```text
 value = 15428
 elements = 3 8
 ```
 
-The package tests and package check were also run after the optimization.
-
-The package check completed with:
-
-```text
-0 errors
-0 warnings
-0 notes
-```
-
-This confirms that the optimization improved the implementation without changing the expected result.
-
-## Computational complexity after optimization
-
 The theoretical complexity remains:
 
 \[
 O(2^n)
 \]
 
-The optimization makes each subset check faster, but it does not reduce the number of subsets.
-
-For example:
-
-```text
-n = 16  ->  65,536 subsets
-n = 20  ->  1,048,576 subsets
-n = 30  ->  more than 1 billion subsets
-```
-
-Therefore, brute force remains unsuitable for large values of `n`.
-
-## Summary
-
-Brute force is exact because it checks every possible subset.
-
-Profiling showed that repeated subset conversion and repeated weight calculations created unnecessary overhead.
-
-Replacing `intToBits()` with reusable bit masks and extracting the weight and value vectors before the loop improved the implementation.
-
-The direct timing improved from approximately 0.14 seconds to 0.05 seconds, which corresponds to about a **2.8-fold speedup** in that comparison.
-
-The theoretical complexity remains:
-
-\[
-O(2^n)
-\]
+The optimization improves the constant cost of processing each subset, but it
+does not remove the exponential growth.
 
 # Dynamic programming
 
 ## Method
 
-Dynamic programming also gives an exact solution, but it avoids checking every possible subset.
+Dynamic programming also finds an exact solution, but it avoids examining
+every possible subset.
 
-Instead, it divides the problem into smaller subproblems and stores the solutions.
+The problem is divided into smaller subproblems.
 
-For every object and every possible capacity, the algorithm compares two choices:
+For each object and each possible capacity, the algorithm compares:
 
-1. do not include the current object,
-2. include the current object if it fits.
+1. the best value when the object is not selected,
+2. the best value when the object is selected, if it fits.
 
-The better value is stored in a dynamic programming table.
+The larger value is stored in a dynamic programming table.
 
-After the table has been completed, the algorithm works backwards through the table to determine which objects were selected.
+After the table has been filled, the selected objects are reconstructed by
+working backwards through the table.
 
-The computational complexity is approximately:
+The computational complexity is:
 
 \[
 O(nW)
@@ -536,11 +449,11 @@ O(nW)
 where:
 
 - `n` is the number of objects,
-- `W` is the maximum knapsack capacity.
+- `W` is the knapsack capacity.
 
 ## Correctness examples
 
-Using the first eight objects with `W = 3500`:
+Using the first eight objects:
 
 ```{r dynamic-example-3500}
 knapsack_dynamic(
@@ -549,14 +462,14 @@ knapsack_dynamic(
 )
 ```
 
-The result is:
+The expected result is:
 
 ```text
 value = 16770
 elements = 5 8
 ```
 
-Using `W = 2000`:
+For a capacity of 2000:
 
 ```{r dynamic-example-2000}
 knapsack_dynamic(
@@ -565,60 +478,33 @@ knapsack_dynamic(
 )
 ```
 
-The result is:
+the expected result is:
 
 ```text
 value = 15428
 elements = 3 8
 ```
 
-These results agree with brute force because both algorithms are exact.
+The agreement with brute force is useful because both methods should return
+the exact optimum.
 
-## Required execution-time experiment
+## Required experiment: 500 objects
 
-The lab asks us to measure the dynamic programming implementation using 500 objects.
+The lab asks us to investigate the dynamic programming execution time using
+500 objects.
 
-```{r dynamic-time}
-dynamic_time <- system.time(
-  dynamic_result <- knapsack_dynamic(
-    x = knapsack_objects[1:500, ],
-    W = 3500
-  )
-)
-
-dynamic_time
-```
-
-`system.time()` returns three main values:
-
-- `user`: CPU time spent running R code,
-- `system`: CPU time spent doing operating-system work,
-- `elapsed`: actual wall-clock time.
-
-In this report, we mainly use `elapsed` when discussing execution time.
-
-## Profiling the original implementation
-
-Before optimization, the dynamic programming implementation took approximately:
-
-```text
-2.83 seconds
-```
-
-for 500 objects and `W = 3500`.
-
-We profiled the implementation using:
-
-```{r original-dynamic-profile, eval=FALSE}
-profvis::profvis({
+```{r dynamic-required-time}
+system.time(
   knapsack_dynamic(
     x = knapsack_objects[1:500, ],
     W = 3500
   )
-})
+)
 ```
 
-The original implementation used two nested loops.
+## Profiling the original implementation
+
+The original version used two nested loops.
 
 The outer loop processed each object:
 
@@ -632,44 +518,7 @@ and the inner loop processed every capacity:
 for (capacity in 0:W)
 ```
 
-The original core of the implementation was:
-
-```{r original-dynamic-code, eval=FALSE}
-for (i in seq_len(n)) {
-
-  item_weight <- x$w[i]
-  item_value <- x$v[i]
-
-  for (capacity in 0:W) {
-
-    if (item_weight > capacity) {
-
-      dp[i + 1, capacity + 1] <-
-        dp[i, capacity + 1]
-
-    } else {
-
-      without_item <-
-        dp[i, capacity + 1]
-
-      with_item <-
-        item_value +
-        dp[
-          i,
-          capacity - item_weight + 1
-        ]
-
-      dp[i + 1, capacity + 1] <-
-        max(
-          without_item,
-          with_item
-        )
-    }
-  }
-}
-```
-
-For 500 objects and `W = 3500`, the inner loop may execute approximately:
+For 500 objects and `W = 3500`, this means approximately:
 
 \[
 500 \times 3501
@@ -677,84 +526,81 @@ For 500 objects and `W = 3500`, the inner loop may execute approximately:
 1,750,500
 \]
 
-times.
+capacity iterations.
 
-The profiler showed that a large amount of execution time was spent inside this inner capacity loop.
+Profiling showed that the inner capacity loop was the main bottleneck.
 
-The function repeatedly:
+The implementation repeatedly read individual cells from the matrix, compared
+values, and wrote individual results back into the matrix.
 
-- read individual matrix values,
-- compared individual values,
-- wrote individual results back into the matrix.
+The original version was profiled using:
 
-The algorithm was correct, but more than 1.7 million small R-level operations created considerable overhead.
+```{r dynamic-original-profile, eval=FALSE}
+profvis::profvis({
+  knapsack_dynamic_original(
+    x = knapsack_objects[1:500, ],
+    W = 3500
+  )
+})
+```
 
 ## Optimization
 
-The main optimization was to remove the inner loop over every capacity.
+The outer loop over the objects was kept, but the inner capacity loop was
+replaced with vector operations.
 
-The outer loop over the objects is still required.
+For each object:
 
-However, instead of processing one capacity at a time, the optimized implementation processes many capacities together using vectors.
-
-The optimized code is:
-
-```{r optimized-dynamic-code, eval=FALSE}
-for (i in seq_len(n)) {
-
-  item_weight <- x$w[i]
-  item_value <- x$v[i]
-
-  previous_row <- dp[i, ]
-  current_row <- previous_row
-
-  if (item_weight <= W) {
-
-    capacities <- item_weight:W
-
-    without_item <-
-      previous_row[
-        capacities + 1
-      ]
-
-    with_item <-
-      item_value +
-      previous_row[
-        capacities -
-          item_weight +
-          1
-      ]
-
-    current_row[
-      capacities + 1
-    ] <-
-      pmax(
-        without_item,
-        with_item
-      )
-  }
-
-  dp[i + 1, ] <- current_row
-}
+```r
+previous_row <- dp[i, ]
+current_row <- previous_row
 ```
 
-The mathematical idea remains the same.
+All capacities where the object can fit are selected together:
 
-For every capacity, the algorithm still compares:
+```r
+capacities <- item_weight:W
+```
 
-- not selecting the current item,
-- selecting the current item.
+The values without the object are:
 
-The difference is that these comparisons are now performed on vectors instead of one matrix cell at a time.
+```r
+without_item <-
+  previous_row[
+    capacities + 1
+  ]
+```
 
-For example, suppose:
+The values when including the object are:
+
+```r
+with_item <-
+  item_value +
+  previous_row[
+    capacities - item_weight + 1
+  ]
+```
+
+The best value for every capacity is then selected with:
+
+```r
+current_row[
+  capacities + 1
+] <-
+  pmax(
+    without_item,
+    with_item
+  )
+```
+
+For example, if:
 
 ```text
 without_item = 1 1 1
 with_item    = 4 5 5
 ```
 
-Then:
+then:
 
 ```r
 pmax(
@@ -769,89 +615,68 @@ returns:
 4 5 5
 ```
 
-The same decisions are made, but R can process the vectors more efficiently than repeatedly running an interpreted inner loop.
+The dynamic programming decisions are unchanged. The difference is that many
+capacities are processed together instead of one at a time through an R loop.
 
 ## Performance before and after optimization
 
-We compared the original and optimized dynamic programming implementations using 500 objects and a knapsack capacity of 3500.
+Because very short timings can vary depending on machine load, both versions
+were measured ten times in the same benchmarking session.
 
-The results were:
+The most recent recorded batch was:
+
+```text
+Original:
+0.27 0.26 0.26 0.27 0.26
+0.25 0.26 0.25 0.28 0.45
+
+Optimized:
+0.14 0.12 0.16 0.13 0.11
+0.14 0.20 0.17 0.18 0.16
+```
+
+The summary is:
 
 | Measurement | Original | Optimized |
 |---|---:|---:|
-| Direct elapsed time | 2.83 s | 0.07 s |
-| Mean elapsed time over 10 runs | Not recorded | 0.047 s |
-| Median elapsed time over 10 runs | Not recorded | 0.050 s |
+| Mean elapsed time | 0.281 s | 0.151 s |
+| Median elapsed time | 0.260 s | 0.150 s |
+| Fastest run | 0.250 s | 0.110 s |
+| Slowest run | 0.450 s | 0.200 s |
 
-The direct speedup was calculated as:
+Using the mean values:
 
 \[
 \text{Speedup}
 =
-\frac{2.83}{0.07}
+\frac{0.281}{0.151}
 \approx
-40.43
+1.86
 \]
 
-Therefore, the optimized implementation was approximately **40.43 times faster** in the direct before-and-after comparison.
+The optimized implementation was therefore approximately **1.86 times faster
+on average** in this repeated benchmark.
 
-The percentage reduction in elapsed time was:
+The reduction in mean elapsed time was:
 
 \[
-\frac{2.83 - 0.07}{2.83}
+\frac{0.281 - 0.151}{0.281}
 \times 100
 \approx
-97.53\%
+46.26\%
 \]
 
-This means that the measured elapsed time was reduced by approximately **97.53%**.
+So the mean elapsed time was reduced by approximately **46.26%**.
 
-Because the optimized implementation is very fast, we also measured it ten times.
+Earlier individual measurements showed larger differences between the two
+versions. Because execution times can vary between runs, the repeated
+same-session benchmark above is used as the final comparison in this report.
 
-```{r dynamic-repeated-time}
-dynamic_optimized_times <- replicate(
-  10,
-  system.time(
-    knapsack_dynamic(
-      x = knapsack_objects[1:500, ],
-      W = 3500
-    )
-  )[["elapsed"]]
-)
+## Profiling after optimization
 
-dynamic_optimized_times
-mean(dynamic_optimized_times)
-median(dynamic_optimized_times)
-```
+The optimized implementation was profiled again:
 
-The recorded optimized times were:
-
-```text
-0.05 0.05 0.05 0.05 0.03
-0.05 0.05 0.04 0.05 0.05
-```
-
-The mean optimized elapsed time was:
-
-```text
-0.047 seconds
-```
-
-and the median optimized elapsed time was:
-
-```text
-0.050 seconds
-```
-
-These repeated measurements confirm that the optimized implementation is consistently much faster than the original version.
-
-## Profiling the optimized implementation
-
-The optimized implementation became so fast that one execution produced only a small number of profiler samples.
-
-Therefore, the same call was repeated 20 times.
-
-```{r optimized-dynamic-profile, eval=FALSE}
+```{r dynamic-optimized-profile, eval=FALSE}
 profvis::profvis({
 
   for (repeat_id in 1:20) {
@@ -865,119 +690,89 @@ profvis::profvis({
 })
 ```
 
-The second profile showed that the large inner capacity loop was no longer present.
+The inner capacity loop was no longer present.
 
-The remaining execution time was mainly associated with:
+The remaining work mainly involved:
 
 - vector indexing,
-- calculating `without_item`,
-- calculating `with_item`,
-- using `pmax()`,
-- writing the completed row into the matrix,
+- calculating the two candidate vectors,
+- `pmax()`,
+- writing each completed row into the matrix,
 - memory management.
 
-## Verifying correctness after optimization
+## Correctness and complexity after optimization
 
-The optimized implementation returned the same results as the original implementation.
+The optimized implementation returned the same results as the original
+version.
 
-For the small example:
+A small test case produced:
 
 ```text
 value = 6
 elements = 1 3
 ```
 
-For the first eight lab objects with `W = 3500`:
+The lab examples also remained:
 
 ```text
+W = 3500
 value = 16770
 elements = 5 8
 ```
 
-For `W = 2000`:
+and:
 
 ```text
+W = 2000
 value = 15428
 elements = 3 8
 ```
 
-The package tests were rerun after the optimization.
-
-The package check completed with:
-
-```text
-0 errors
-0 warnings
-0 notes
-```
-
-Therefore, the performance improvement did not change the expected behaviour of the function.
-
-## Computational complexity after optimization
-
-The theoretical complexity remains:
+The theoretical complexity is still:
 
 \[
 O(nW)
 \]
 
-The number of dynamic programming states has not changed.
-
-The optimization only changes how efficiently those states are processed in R.
-
-Therefore, this is an implementation optimization rather than a change to the mathematical algorithm.
-
-## Summary
-
-Dynamic programming is exact and much more scalable than brute force.
-
-Profiling showed that the inner capacity loop was the main performance bottleneck.
-
-Replacing that loop with vectorized operations reduced the direct measured elapsed time from approximately 2.83 seconds to 0.07 seconds.
-
-This corresponds to about a **40.43-fold speedup** in the direct comparison.
-
-Repeated optimized measurements had a mean elapsed time of approximately 0.047 seconds.
-
-The theoretical complexity remains:
-
-\[
-O(nW)
-\]
+The number of dynamic programming states is unchanged. The optimization only
+changes how efficiently these states are processed in R.
 
 # Greedy algorithm
 
 ## Method
 
-The greedy algorithm is different from brute force and dynamic programming because it does not search for the exact optimum.
+The greedy algorithm is an approximation method.
 
-Instead, each object is given a value-to-weight ratio:
+Each object is assigned a value-to-weight ratio:
 
 \[
 \frac{v}{w}
 \]
 
-Objects with a high value relative to their weight are considered first.
+Objects are sorted from the highest ratio to the lowest ratio.
 
-The objects are sorted by this ratio in descending order.
+The algorithm then moves through the sorted objects and selects an object when
+it fits within the remaining knapsack capacity.
 
-The algorithm then moves through the sorted objects and selects an object whenever it fits within the remaining knapsack capacity.
+This approach is fast, but it is not guaranteed to find the optimal solution.
 
-This method is very fast, but it does not guarantee the optimal solution.
+The main operations are:
 
-Its overall computational complexity is approximately:
+- calculating ratios: \(O(n)\),
+- sorting: \(O(n \log n)\),
+- scanning the sorted objects: \(O(n)\).
+
+The total complexity is therefore dominated by sorting:
 
 \[
 O(n \log n)
 \]
 
-because sorting is the dominant operation.
+## Required experiment: one million objects
 
-## Correctness and required execution-time experiment
+The lab asks us to investigate the greedy algorithm using 1,000,000 objects.
 
-The lab asks us to measure the greedy algorithm using 1,000,000 objects.
-
-The following code generates that data using the same random number generator settings.
+The data was generated using the same random-number-generator settings:
 
 ```{r greedy-data, eval=FALSE}
 suppressWarnings(
@@ -1011,9 +806,9 @@ greedy_objects <- data.frame(
 )
 ```
 
-The execution time was measured using:
+The function can then be timed with:
 
-```{r greedy-time, eval=FALSE}
+```{r greedy-required-time, eval=FALSE}
 system.time(
   greedy_knapsack(
     x = greedy_objects,
@@ -1022,36 +817,10 @@ system.time(
 )
 ```
 
-The original implementation took approximately:
-
-```text
-0.958 seconds
-```
-
-in the initial measurement.
-
-After optimization, the corresponding measurement was approximately:
-
-```text
-0.086 seconds
-```
-
-Because these timings can vary, both implementations were later measured ten times.
-
 ## Profiling the original implementation
 
-The original greedy implementation was profiled using `profvis`.
-
-```{r original-greedy-profile, eval=FALSE}
-profvis::profvis({
-  greedy_knapsack_original(
-    x = greedy_objects,
-    W = 3500
-  )
-})
-```
-
-The profiler showed that a substantial amount of execution time was associated with the capacity check inside the selection loop:
+The original implementation repeatedly accessed data-frame columns inside the
+selection loop:
 
 ```r
 if (
@@ -1060,23 +829,7 @@ if (
 )
 ```
 
-The profiler attributed approximately 560 milliseconds of sampled time to this expression.
-
-Because the loop may process up to 1,000,000 objects, repeatedly accessing:
-
-```r
-x$w[i]
-```
-
-and:
-
-```r
-x$v[i]
-```
-
-creates unnecessary overhead.
-
-The original implementation also repeatedly extended the vector of selected elements:
+It also repeatedly grew the selected-elements vector:
 
 ```r
 elements <- c(
@@ -1085,87 +838,61 @@ elements <- c(
 )
 ```
 
-Repeatedly growing a vector can cause additional memory allocation and copying.
+Profiling showed that these repeated operations contributed unnecessary
+overhead when processing one million objects.
+
+The original implementation was profiled using:
+
+```{r greedy-original-profile, eval=FALSE}
+profvis::profvis({
+  greedy_knapsack_original(
+    x = greedy_objects,
+    W = 3500
+  )
+})
+```
 
 ## Optimization
 
-Three main changes were made.
-
-First, the weight and value columns were extracted before the loop:
+The weight and value columns were extracted before the loop:
 
 ```r
 weights <- x$w
 values <- x$v
 ```
 
-Second, the current object's weight was stored in a local variable:
+The current weight was cached:
 
 ```r
 item_weight <- weights[i]
 ```
 
-Third, the selected-elements vector was preallocated instead of repeatedly extended.
+The output vector was also preallocated:
 
-The optimized implementation is:
-
-```{r optimized-greedy-code, eval=FALSE}
-weights <- x$w
-values <- x$v
-
-ratio <- values / weights
-
-order_items <- order(
-  ratio,
-  decreasing = TRUE
-)
-
-total_weight <- 0
-total_value <- 0
-
+```r
 elements <- integer(
   nrow(x)
 )
 
 count <- 0L
-
-for (i in order_items) {
-
-  item_weight <- weights[i]
-
-  if (
-    total_weight +
-      item_weight <= W
-  ) {
-
-    total_weight <-
-      total_weight +
-      item_weight
-
-    total_value <-
-      total_value +
-      values[i]
-
-    count <- count + 1L
-
-    elements[count] <- i
-  }
-}
-
-elements <-
-  elements[
-    seq_len(count)
-  ]
 ```
 
-The greedy strategy itself has not changed.
+Selected indices were written directly into the preallocated vector:
 
-The same value-to-weight ordering is used.
+```r
+count <- count + 1L
+elements[count] <- i
+```
 
-The optimization only reduces unnecessary work inside the selection loop.
+At the end, only the used part of the vector was kept.
+
+The greedy strategy itself did not change. The optimization only reduced
+repeated data access and memory allocation.
 
 ## Performance before and after optimization
 
-Both versions were measured ten times using the same one-million-object dataset and a knapsack capacity of 3500.
+Both versions were measured ten times using the same one-million-object
+dataset.
 
 The results were:
 
@@ -1176,7 +903,7 @@ The results were:
 | Fastest run | 0.867 s | 0.079 s |
 | Slowest run | 0.926 s | 0.084 s |
 
-The speedup was calculated as:
+The speedup was:
 
 \[
 \text{Speedup}
@@ -1186,27 +913,26 @@ The speedup was calculated as:
 10.92
 \]
 
-Therefore, the optimized greedy implementation was approximately **10.92 times faster on average**.
+The optimized version was therefore approximately **10.92 times faster on
+average**.
 
-The percentage reduction in mean elapsed time was:
+The reduction in mean elapsed time was:
 
 \[
-\frac{0.8856 - 0.0811}
-{0.8856}
+\frac{0.8856 - 0.0811}{0.8856}
 \times 100
 \approx
 90.84\%
 \]
 
-This means that the mean elapsed time was reduced by approximately **90.84%**.
+So the mean execution time was reduced by approximately **90.84%**.
 
-The repeated measurements also show that the optimized implementation was stable, with all optimized runs taking approximately 0.08 seconds.
+## Profiling after optimization
 
-## Profiling the optimized implementation
+Because one optimized execution is very short, the function was repeated
+twenty times while profiling:
 
-Because one optimized run took only around 0.08 seconds, the function was repeated 20 times during profiling.
-
-```{r optimized-greedy-profile, eval=FALSE}
+```{r greedy-optimized-profile, eval=FALSE}
 profvis::profvis({
 
   for (repeat_id in 1:20) {
@@ -1220,39 +946,31 @@ profvis::profvis({
 })
 ```
 
-The remaining execution time was mainly associated with sorting and iterating through the ordered objects.
+The remaining execution time was mainly associated with:
 
-The profiler showed approximately:
+- sorting using `order()`,
+- the capacity check,
+- retrieving weights,
+- iterating through the sorted indices.
 
-| Operation | Profiled time |
-|---|---:|
-| Sorting using `order()` | 460 ms |
-| Capacity check | 430 ms |
-| Retrieving `weights[i]` | 340 ms |
-| Selection loop | 140 ms |
+This is expected because sorting is also the dominant operation in the
+theoretical complexity.
 
-These values are profiling samples collected across repeated executions. They are not separate wall-clock timing measurements.
+## Correctness and complexity after optimization
 
-## Verifying correctness after optimization
-
-The original and optimized implementations were compared using identical input data.
+The original and optimized greedy implementations were compared on identical
+input data.
 
 ```{r greedy-correctness, eval=FALSE}
-original_result <-
+identical(
   greedy_knapsack_original(
     greedy_objects,
     W = 3500
-  )
-
-optimized_result <-
+  ),
   greedy_knapsack(
     greedy_objects,
     W = 3500
   )
-
-identical(
-  original_result,
-  optimized_result
 )
 ```
 
@@ -1262,135 +980,49 @@ The result was:
 [1] TRUE
 ```
 
-This confirms that the optimization did not change the output for the benchmark data.
+The optimized implementation therefore preserved the behaviour of the original
+implementation for the benchmark data.
 
-The complete package test suite was also run.
-
-The recorded result was:
-
-```text
-FAIL 0 | WARN 0 | SKIP 0 | PASS 58
-```
-
-## Computational complexity after optimization
-
-The optimized greedy implementation performs three main operations.
-
-Calculating the value-to-weight ratio takes:
-
-\[
-O(n)
-\]
-
-Sorting the objects takes:
+Its complexity remains:
 
 \[
 O(n \log n)
 \]
 
-Selecting objects using one loop takes:
+# Comparison of the three algorithms
 
-\[
-O(n)
-\]
+The three algorithms solve the same optimization problem, but they make very
+different trade-offs.
 
-The sorting step dominates the overall running time.
-
-Therefore, the total computational complexity remains approximately:
-
-\[
-O(n \log n)
-\]
-
-The additional memory requirement is approximately:
-
-\[
-O(n)
-\]
-
-because vectors are stored for ratios, ordering, and selected elements.
-
-## Summary
-
-The greedy method is much faster than the exact methods for very large inputs, but it is not guaranteed to return the optimal solution.
-
-Profiling showed that repeated data-frame access and repeated vector growth were important implementation costs.
-
-Extracting the weight and value vectors before the loop, caching the current weight, and preallocating the result vector reduced the mean elapsed time from approximately 0.8856 seconds to 0.0811 seconds.
-
-This corresponds to approximately a **10.92-fold speedup** and about a **90.84% reduction in execution time**.
-
-The overall complexity remains:
-
-\[
-O(n \log n)
-\]
-
-# Final comparison of the three algorithms
-
-The three algorithms solve the same knapsack problem, but they make very different trade-offs between correctness and speed.
-
-| Algorithm | Exact solution | Complexity | Required input size | Main optimization | Measured improvement |
+| Algorithm | Exact? | Complexity | Required input size | Main optimization | Mean benchmark speedup |
 |---|---|---|---:|---|---:|
-| Brute force | Yes | \(O(2^n)\) | `n = 16` | Bit masks instead of repeated `intToBits()` | ~2.8x |
-| Dynamic programming | Yes | \(O(nW)\) | `n = 500` | Vectorized capacity calculations | ~40.43x |
-| Greedy | No | \(O(n \log n)\) | `n = 1,000,000` | Cached vectors and preallocated output | ~10.92x |
+| Brute force | Yes | \(O(2^n)\) | `n = 16` | Bit masks and cached vectors | 4.70x |
+| Dynamic programming | Yes | \(O(nW)\) | `n = 500` | Vectorized capacity calculations | 1.86x |
+| Greedy | No | \(O(n \log n)\) | `n = 1,000,000` | Cached vectors and preallocated output | 10.92x |
 
-Brute force is exact but scales poorly because the number of possible subsets grows exponentially.
+Brute force guarantees the optimum, but its exponential growth limits it to
+small inputs.
 
-Dynamic programming is also exact, but it reuses solutions to smaller subproblems instead of checking every subset.
+Dynamic programming also guarantees the optimum and is much more scalable
+because previously solved subproblems are reused.
 
-The greedy algorithm is the fastest method for very large inputs, but it is an approximation and does not guarantee the optimal result.
+The greedy algorithm scales to very large inputs, but its result is only an
+approximation.
 
-The required input sizes in the lab reflect these differences.
+An important observation from the profiling work is that computational
+complexity and implementation efficiency are different concepts.
 
-Brute force is tested with only 16 objects because its exponential complexity makes larger inputs expensive.
-
-Dynamic programming can handle hundreds of objects because its complexity grows approximately with both `n` and `W`.
-
-Greedy can process one million objects because its dominant operation is sorting.
-
-# Effect of profiling and optimization
-
-Profiling was useful because execution time alone only tells us that a function is slow. It does not explain why it is slow.
-
-Using `profvis`, we identified specific implementation bottlenecks.
-
-For brute force, the main opportunities were repeated subset conversion and repeated data access.
-
-For dynamic programming, the main bottleneck was the inner capacity loop.
-
-For greedy, repeated data-frame access and repeated growth of the selected-elements vector created unnecessary overhead.
-
-The optimizations did not change the mathematical strategy of any algorithm.
-
-Their theoretical complexities remained:
-
-\[
-O(2^n)
-\]
-
-for brute force,
-
-\[
-O(nW)
-\]
-
-for dynamic programming, and
-
-\[
-O(n \log n)
-\]
-
-for greedy.
-
-The improvements came from implementing the same algorithms more efficiently in R.
+The optimizations did not change the theoretical complexity of any algorithm.
+They reduced overhead in the R implementation.
 
 # Testing and package validation
 
-Correctness was checked throughout the implementation and optimization process.
+Correctness was checked throughout the implementation and optimization work.
 
-After optimization, the functions were compared with known examples and the automated test suite was run again.
+The provided test suites were used for the brute force and greedy functions,
+and additional tests were written for the dynamic programming implementation.
+
+After the optimizations, the complete test suite was run again.
 
 The package was also checked using:
 
@@ -1398,7 +1030,7 @@ The package was also checked using:
 devtools::check()
 ```
 
-The package check completed with:
+The final package check completed with:
 
 ```text
 0 errors
@@ -1406,26 +1038,319 @@ The package check completed with:
 0 notes
 ```
 
-This is important because optimization should not improve performance at the cost of correctness or package quality.
+This confirms that the performance changes did not introduce package-level
+errors, warnings, or notes.
 
-# Starred exercise
+# Starred exercise: profiling and improving the API package
 
-The starred exercise and its performance analysis will be added here after it has been completed.
+For the starred exercise, we profiled and improved the `apihelperR` package
+developed in the previous lab.
+
+The package retrieves earthquake information from the USGS Earthquake API.
+
+Its main workflow is:
+
+```text
+validate inputs
+    ↓
+send HTTP request
+    ↓
+read JSON response
+    ↓
+parse earthquake features
+    ↓
+return data frame
+```
+
+## Profiling the complete API call
+
+The complete request was first measured using:
+
+```{r api-complete-time, eval=FALSE}
+system.time(
+  get_earthquakes(
+    start_date = "2026-01-01",
+    end_date = "2026-01-02",
+    min_magnitude = 4,
+    limit = 100
+  )
+)
+```
+
+One initial request had an elapsed time of approximately:
+
+```text
+0.64 seconds
+```
+
+Profiling showed that a large part of the complete request was associated with:
+
+```r
+httr2::req_perform()
+```
+
+and the underlying network operations.
+
+Network latency depends on external conditions such as the internet connection
+and the USGS server. It is therefore not a reliable target for evaluating an R
+code optimization.
+
+For this reason, the parser was isolated from the network request.
+
+## Creating a controlled parser benchmark
+
+The real API request returned 45 earthquake features.
+
+To create a larger controlled workload, these real features were repeated in
+memory until the benchmark contained 5000 features:
+
+```{r parser-data, eval=FALSE}
+large_parser_data <- parser_data
+
+large_parser_data$features <- rep(
+  parser_data$features,
+  length.out = 5000
+)
+```
+
+These are not 5000 different earthquakes.
+
+The repetition is only used to create a sufficiently large parser workload
+without making additional network requests.
+
+## Profiling the original parser
+
+The original parser used the following pattern:
+
+```r
+result <- lapply(
+  features,
+  function(feature) {
+
+    data.frame(
+      id = feature$id,
+      time = as.POSIXct(
+        feature$properties$time / 1000,
+        origin = "1970-01-01",
+        tz = "UTC"
+      ),
+      magnitude = feature$properties$mag,
+      place = feature$properties$place,
+      longitude = feature$geometry$coordinates[[1]],
+      latitude = feature$geometry$coordinates[[2]],
+      depth = feature$geometry$coordinates[[3]],
+      tsunami = feature$properties$tsunami,
+      stringsAsFactors = FALSE
+    )
+  }
+)
+
+do.call(
+  rbind,
+  result
+)
+```
+
+For 5000 features, this creates 5000 one-row data frames and then combines them.
+
+`profvis` showed that the repeated `lapply()` and `data.frame()` work dominated
+the parser execution time.
+
+## Parser optimization
+
+The parser was changed to extract complete vectors first.
+
+For example:
+
+```r
+ids <- vapply(
+  features,
+  function(feature) {
+    as.character(feature$id)
+  },
+  character(1)
+)
+```
+
+The same approach was used for:
+
+- time,
+- magnitude,
+- place,
+- longitude,
+- latitude,
+- depth,
+- tsunami.
+
+After the vectors had been created, one final data frame was constructed.
+
+The main change was therefore:
+
+```text
+Original:
+5000 small data frames
+        ↓
+combine them
+
+Optimized:
+extract complete column vectors
+        ↓
+create one data frame
+```
+
+This removes thousands of unnecessary data-frame constructions.
+
+## Parser performance
+
+The original and optimized parsers were each measured ten times using the same
+5000-feature in-memory benchmark.
+
+The original measurements were:
+
+```text
+4.26 3.22 2.17 2.15 2.30
+6.77 7.77 6.92 7.06 7.21
+```
+
+The optimized measurements were:
+
+```text
+0.07 0.04 0.05 0.03 0.03
+0.05 0.05 0.03 0.01 0.03
+```
+
+The summary is:
+
+| Measurement | Original | Optimized |
+|---|---:|---:|
+| Mean elapsed time | 4.983 s | 0.039 s |
+| Median elapsed time | 5.515 s | 0.035 s |
+
+The mean-based speedup was:
+
+\[
+\frac{4.983}{0.039}
+\approx
+127.77
+\]
+
+The optimized parser was therefore approximately **127.77 times faster on
+average** in this controlled parser benchmark.
+
+The reduction in mean elapsed time was:
+
+\[
+\frac{4.983 - 0.039}{4.983}
+\times 100
+\approx
+99.22\%
+\]
+
+So the parser's mean execution time was reduced by approximately **99.22%**.
+
+This result refers only to the controlled parser benchmark. It should not be
+interpreted as a 127.77-fold improvement in the complete API request because
+the complete request also includes external network latency.
+
+## Profiling and correctness after optimization
+
+The optimized parser was profiled again:
+
+```{r parser-optimized-profile, eval=FALSE}
+profvis::profvis({
+
+  for (repeat_id in 1:10) {
+
+    parse_earthquakes(
+      large_parser_data
+    )
+  }
+
+})
+```
+
+The repeated creation of one-row data frames was no longer present. The
+remaining work was mainly associated with the `vapply()` extraction operations.
+
+Correctness was checked on both the real 45-feature response and the
+5000-feature benchmark.
+
+In both cases:
+
+```r
+identical(
+  old_result,
+  new_result
+)
+```
+
+returned:
+
+```text
+[1] TRUE
+```
+
+The API package was then checked again.
+
+The final result was:
+
+```text
+0 errors
+0 warnings
+0 notes
+```
+
+The normal `get_earthquakes()` function also continued to return the expected
+45-row, 8-column data frame.
+
+A later complete API call took approximately 0.07 seconds, compared with an
+earlier 0.64-second request. However, these complete-request values are not
+used as the main optimization result because network conditions can change
+between calls.
+
+The isolated parser benchmark gives the fairer comparison of the code that was
+actually changed.
 
 # Conclusion
 
-This lab demonstrates that choosing an algorithm has a major effect on both correctness and performance.
+This lab demonstrates both the importance of algorithm choice and the
+importance of implementation details.
 
-Brute force is exact and simple to understand, but its exponential complexity makes it unsuitable for large inputs.
+Brute force is exact, but its \(O(2^n)\) complexity causes the number of
+possible solutions to grow exponentially.
 
-Dynamic programming is also exact and is much more practical because it reuses previously calculated results.
+Dynamic programming is also exact, but it reuses previously calculated
+subproblems and has complexity \(O(nW)\).
 
-The greedy method is extremely fast for large inputs, but it trades guaranteed optimality for speed.
+The greedy method has complexity \(O(n \log n)\) and can handle much larger
+inputs, but it does not guarantee the optimal solution.
 
-Profiling also showed that theoretical complexity is not the only factor that affects real execution time.
+Profiling showed that performance can often be improved without changing the
+algorithm itself.
 
-Implementation details can have a large effect on performance.
+For brute force, repeated bit conversion was reduced by using reusable bit
+masks.
 
-By profiling the functions and improving the slow parts, we achieved substantial speed improvements while keeping the behaviour of the algorithms unchanged.
+For dynamic programming, the inner capacity loop was replaced with vector
+operations.
 
-The final remaining part of the report is the starred exercise.
+For greedy, repeated data-frame access and dynamic vector growth were reduced.
+
+The starred exercise showed the same principle in the previous API package:
+the expensive construction of thousands of small data frames was replaced by
+vector extraction followed by one final data-frame construction.
+
+In every case, correctness was checked after optimization.
+
+The final package passed its tests and `R CMD check` completed with:
+
+```text
+0 errors
+0 warnings
+0 notes
+```
+
+The main lesson from the lab is that theoretical complexity explains how an
+algorithm scales, while profiling explains how efficiently a particular
+implementation performs in practice. Both are important when writing efficient
+R code.

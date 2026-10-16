@@ -1,9 +1,24 @@
 Package: knapsackR
-Title: What the Package Does (One Line, Title Case)
+Title: Algorithms for the 0/1 Knapsack Problem
 Version: 0.0.0.9000
-Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"))
-Description: What the package does (one paragraph).
+Authors@R: c(
+    person(
+        "Venkata Balaji",
+        "Anupoju",
+        email = "venan324@student.liu.se",
+        role = c("aut", "cre")
+    ),
+    person(
+        "Marwan",
+        "Karim",
+        email = "marka671@student.liu.se",
+        role = "aut"
+    )
+  )
+Description: Implements brute force, dynamic programming, and greedy
+    algorithms for solving the 0/1 knapsack problem. The package is used
+    to compare computational complexity, execution time, profiling results,
+    and performance optimizations of the different approaches.
 License: MIT + file LICENSE
 Config/roxygen2/version: 8.1.0
 Encoding: UTF-8

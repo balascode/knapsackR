@@ -12,6 +12,14 @@
 #'   \item{elements}{The row numbers of the selected items.}
 #' }
 #'
+#'#' @examples
+#' x <- data.frame(
+#'   w = c(1, 3, 4),
+#'   v = c(1, 4, 5)
+#' )
+#'
+#' knapsack_dynamic(x, W = 5)
+#'
 #' @export
 knapsack_dynamic <- function(x, W) {
 

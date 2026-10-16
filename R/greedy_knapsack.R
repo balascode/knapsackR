@@ -13,6 +13,14 @@
 #'   \item{elements}{The row numbers of the selected items.}
 #' }
 #'
+#'#' @examples
+#' x <- data.frame(
+#'   w = c(1, 3, 4),
+#'   v = c(1, 4, 5)
+#' )
+#'
+#' greedy_knapsack(x, W = 5)
+#'
 #' @export
 greedy_knapsack <- function(x, W) {
 

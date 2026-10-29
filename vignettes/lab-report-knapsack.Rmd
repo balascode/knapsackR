@@ -1040,32 +1040,55 @@ The measured mean times are therefore:
 - optimized implementation:
   `r round(mean(greedy_optimized_times), 4)` seconds.
 
-The mean-based speedup is:
+The ratio between the original and optimized mean execution times is:
 
 ```{r greedy-speedup}
 greedy_speedup <-
   mean(greedy_original_times) /
   mean(greedy_optimized_times)
 
-greedy_reduction <-
+greedy_percent_change <-
   (
-    mean(greedy_original_times) -
-      mean(greedy_optimized_times)
+    mean(greedy_optimized_times) -
+      mean(greedy_original_times)
   ) /
   mean(greedy_original_times) *
   100
 
+greedy_benchmark_interpretation <-
+  if (greedy_speedup > 1) {
+    paste0(
+      "The optimized implementation was approximately ",
+      round(greedy_speedup, 2),
+      " times faster on average in this benchmark."
+    )
+  } else if (greedy_speedup < 1) {
+    paste0(
+      "No performance gain was observed in this benchmark. The optimized ",
+      "implementation took approximately ",
+      round(greedy_percent_change, 2),
+      "% longer on average."
+    )
+  } else {
+    "The two implementations had the same mean elapsed time in this benchmark."
+  }
+
 greedy_speedup
-greedy_reduction
+greedy_percent_change
 ```
 
-In this benchmark, the optimized implementation is approximately
-**`r round(greedy_speedup, 2)` times faster** on average, corresponding to an
-elapsed-time reduction of approximately **`r round(greedy_reduction, 2)`%**.
+`r greedy_benchmark_interpretation`
+
+This result is reasonable because, after applying the course stopping rule, the
+selection loop usually terminates after relatively few objects. Most of the
+runtime is therefore spent calculating ratios and sorting all one million
+objects. The attempted loop-level optimizations have little opportunity to
+improve the total runtime and can even add overhead, for example by
+preallocating a vector of length one million.
 
 Because execution time depends on hardware and system load, the exact values
-may differ between machines. The important comparison is that both versions are
-measured in the same R session using identical data and the same greedy rule.
+may differ between machines. Both implementations are measured in the same R
+session using identical data and exactly the same greedy rule.
 
 ## Profiling after optimization
 
@@ -1104,11 +1127,11 @@ O(n \log n)
 The three algorithms solve the same optimization problem, but they make very
 different trade-offs.
 
-| Algorithm | Exact? | Complexity | Required input size | Main optimization | Mean benchmark speedup |
+| Algorithm | Exact? | Complexity | Required input size | Main implementation change | Benchmark result |
 |---|---|---|---:|---|---:|
-| Brute force | Yes | \(O(2^n)\) | `n = 16` | Bit masks and cached vectors | 4.70x |
-| Dynamic programming | Yes | \(O(nW)\) | `n = 500` | Vectorized capacity calculations | 1.86x |
-| Greedy | No | \(O(n \log n)\) | `n = 1,000,000` | Cached vectors and preallocated output | `r paste0(round(greedy_speedup, 2), "x")` |
+| Brute force | Yes | \(O(2^n)\) | `n = 16` | Bit masks and cached vectors | 4.70x faster |
+| Dynamic programming | Yes | \(O(nW)\) | `n = 500` | Vectorized capacity calculations | 1.86x faster |
+| Greedy | No | \(O(n \log n)\) | `n = 1,000,000` | Cached vectors and preallocated output | `r if (greedy_speedup > 1) paste0(round(greedy_speedup, 2), "x faster") else if (greedy_speedup < 1) paste0(round(greedy_percent_change, 2), "% slower") else "same mean time"` |
 
 Brute force guarantees the optimum, but its exponential growth limits it to
 small inputs.
@@ -1136,21 +1159,20 @@ After the corrections and optimizations, the complete test suite was run again. 
 
 At the current stage the test suite contains 46 passing tests with no failures, warnings, or skips.
 
-The package should also be checked using:
+The final package check was run using:
 
 ```r
 devtools::check()
 ```
 
-Before submission, `devtools::check()` must complete with:
+After the final code, test, documentation, and vignette changes, the package
+completed `R CMD check` with:
 
 ```text
 0 errors
 0 warnings
 0 notes
 ```
-
-This check must be rerun after the final vignette and code changes.
 
 # Starred exercise: profiling and improving the API package
 
@@ -1446,6 +1468,9 @@ For dynamic programming, the inner capacity loop was replaced with vector
 operations.
 
 For greedy, repeated data-frame access and dynamic vector growth were reduced.
+After correcting the algorithm to stop at the first non-fitting item, the
+one-million-object benchmark showed that these loop-level changes did not
+produce a reliable overall speedup because sorting dominates the runtime.
 
 The starred exercise showed the same principle in the previous API package:
 the expensive construction of thousands of small data frames was replaced by

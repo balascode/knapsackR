@@ -109,7 +109,7 @@ Dynamic programming finds an optimal solution while avoiding repeated calculatio
 
 ### 3. Greedy Heuristic
 
-The greedy heuristic sorts items according to their value-to-weight ratio and selects items that fit within the remaining capacity.
+The greedy heuristic sorts items by decreasing value-to-weight ratio, adds items in that order, and stops when the next item does not fit within the remaining capacity.
 
 Example:
 
@@ -162,18 +162,20 @@ $elements
 
 ## Performance testing
 
-The greedy heuristic was benchmarked using 1,000,000 randomly generated items.
+The laboratory report vignette benchmarks the greedy heuristic using
+1,000,000 reproducibly generated objects and compares the original and current
+implementations using the same course-specified greedy rule.
 
-The measured execution time was approximately 0.908 seconds using a knapsack capacity of 3500.
+Execution times are intentionally not hard-coded in this README because they
+depend on the computer and current system load. The vignette reports the
+measurements produced when it is built.
 
-The returned total value was approximately 6,997,419.
+To reproduce the required one-million-object timing experiment:
 
-Results may vary depending on hardware and system conditions.
-
-To reproduce the benchmark:
-
-  ```r
-n <- 1000000
+```r
+suppressWarnings(
+  RNGversion(min(as.character(getRversion()), "3.5.3"))
+)
 
 set.seed(
   42,
@@ -181,26 +183,26 @@ set.seed(
   normal.kind = "Inversion"
 )
 
+n <- 1000000
+
 knapsack_objects <- data.frame(
   w = sample(1:4000, size = n, replace = TRUE),
   v = runif(n = n, 0, 10000)
 )
 
 system.time(
-  result <- greedy_knapsack(
+  greedy_knapsack(
     x = knapsack_objects,
     W = 3500
   )
 )
-
-result$value
 ```
 
 ## Testing
 
 The package uses `testthat` for automated testing.
 
-The tests check algorithm correctness, return values, selected elements, and input validation.
+The package includes the official course test suites for `brute_force_knapsack()` and `greedy_knapsack()`, together with a student-written test suite for `knapsack_dynamic()`. The tests cover correctness, return values, selected elements, and input validation.
 
 To run all unit tests:
 

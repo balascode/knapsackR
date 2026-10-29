@@ -17,16 +17,17 @@ A list with:
 \item{value}{The total value of the selected items.}
 \item{elements}{The row numbers of the selected items.}
 }
-
-#' @examples
-x <- data.frame(
-w = c(1, 3, 4),
-v = c(1, 4, 5)
-)
-
-greedy_knapsack(x, W = 5)
 }
 \description{
 Finds an approximate solution to the knapsack problem by
 selecting items based on their value-to-weight ratio.
+}
+\examples{
+x <- data.frame(
+  w = c(1, 3, 4),
+  v = c(1, 4, 5)
+)
+
+greedy_knapsack(x, W = 5)
+
 }

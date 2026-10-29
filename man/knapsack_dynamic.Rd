@@ -17,16 +17,17 @@ A list with:
 \item{value}{The maximum total value.}
 \item{elements}{The row numbers of the selected items.}
 }
-
-#' @examples
-x <- data.frame(
-w = c(1, 3, 4),
-v = c(1, 4, 5)
-)
-
-knapsack_dynamic(x, W = 5)
 }
 \description{
 Finds the maximum total value that can be placed in a knapsack
 with capacity W using a dynamic programming approach.
+}
+\examples{
+x <- data.frame(
+  w = c(1, 3, 4),
+  v = c(1, 4, 5)
+)
+
+knapsack_dynamic(x, W = 5)
+
 }

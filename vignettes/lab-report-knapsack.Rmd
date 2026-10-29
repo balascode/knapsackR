@@ -741,26 +741,21 @@ changes how efficiently these states are processed in R.
 
 ## Method
 
-The greedy algorithm is an approximation method.
+The greedy algorithm first calculates the value-to-weight ratio for every
+object and sorts the objects in decreasing order of this ratio.
 
-Each object is assigned a value-to-weight ratio:
+The objects are then considered in that order. An object is added if it fits
+within the remaining knapsack capacity. If the next object does not fit, the
+algorithm stops and returns the objects selected so far.
 
-\[
-\frac{v}{w}
-\]
-
-Objects are sorted from the highest ratio to the lowest ratio.
-
-The algorithm then moves through the sorted objects and selects an object when
-it fits within the remaining knapsack capacity.
-
-This approach is fast, but it is not guaranteed to find the optimal solution.
+This is the greedy rule used by the course test suite. The method is only a
+heuristic and is therefore not guaranteed to return the optimal solution.
 
 The main operations are:
 
 - calculating ratios: \(O(n)\),
 - sorting: \(O(n \log n)\),
-- scanning the sorted objects: \(O(n)\).
+- scanning the sorted objects: at most \(O(n)\).
 
 The total complexity is therefore dominated by sorting:
 
@@ -768,13 +763,36 @@ The total complexity is therefore dominated by sorting:
 O(n \log n)
 \]
 
+## Correctness examples
+
+The implementation was checked with the official course test suite.
+
+For example, using the reproducible data from the lab instructions:
+
+```{r greedy-example-800}
+greedy_knapsack(
+  x = knapsack_objects[1:800, ],
+  W = 3500
+)
+```
+
+The expected value from the lab is:
+
+```text
+192647
+```
+
+The official test suite also checks additional input sizes and capacities.
+These tests are included in the package under `tests/testthat/`.
+
 ## Required experiment: one million objects
 
-The lab asks us to investigate the greedy algorithm using 1,000,000 objects.
+The lab asks us to investigate the execution time for 1,000,000 objects.
 
-The data was generated using the same random-number-generator settings:
+The data is generated using the same random-number-generator settings as in
+the lab instructions:
 
-```{r greedy-data, eval=FALSE}
+```{r greedy-data}
 suppressWarnings(
   RNGversion(
     min(
@@ -806,131 +824,252 @@ greedy_objects <- data.frame(
 )
 ```
 
-The function can then be timed with:
+A single execution can be measured with:
 
-```{r greedy-required-time, eval=FALSE}
-system.time(
+```{r greedy-required-time}
+greedy_required_time <- system.time(
   greedy_knapsack(
     x = greedy_objects,
     W = 3500
   )
 )
+
+greedy_required_time
 ```
+
+The elapsed time on the machine used to build this vignette is
+`r round(unname(greedy_required_time["elapsed"]), 4)` seconds.
+
+Execution time depends on the computer and current system load, so this value
+may differ slightly between machines.
+
+## Original implementation used for the performance comparison
+
+To compare implementation efficiency fairly, the original and optimized
+versions must use the same greedy rule. In particular, both versions stop when
+the first item in decreasing value-to-weight-ratio order does not fit.
+
+The original implementation below deliberately keeps the less efficient
+operations that were later optimized: repeated data-frame access and repeated
+growth of the `elements` vector.
+
+```{r greedy-original-function}
+greedy_knapsack_original <- function(x, W) {
+
+  ratio <- x$v / x$w
+  order_items <- order(ratio, decreasing = TRUE)
+
+  total_weight <- 0
+  total_value <- 0
+  elements <- integer(0)
+
+  for (i in order_items) {
+
+    if (total_weight + x$w[i] <= W) {
+
+      total_weight <- total_weight + x$w[i]
+      total_value <- total_value + x$v[i]
+
+      elements <- c(elements, i)
+
+    } else {
+
+      break
+    }
+  }
+
+  list(
+    value = round(total_value),
+    elements = elements
+  )
+}
+```
+
+This function is used only for the performance comparison in the vignette. The
+exported package function is `greedy_knapsack()`.
 
 ## Profiling the original implementation
 
-The original implementation repeatedly accessed data-frame columns inside the
+The original implementation repeatedly accesses data-frame columns inside the
 selection loop:
 
 ```r
-if (
-  total_weight +
-    x$w[i] <= W
-)
+if (total_weight + x$w[i] <= W)
 ```
 
-It also repeatedly grew the selected-elements vector:
+It also repeatedly grows the selected-elements vector:
 
 ```r
-elements <- c(
-  elements,
-  i
-)
+elements <- c(elements, i)
 ```
 
-Profiling showed that these repeated operations contributed unnecessary
-overhead when processing one million objects.
+These operations create unnecessary overhead compared with extracting vectors
+once and preallocating the output.
 
-The original implementation was profiled using:
+The original implementation can be profiled with:
 
 ```{r greedy-original-profile, eval=FALSE}
 profvis::profvis({
-  greedy_knapsack_original(
-    x = greedy_objects,
-    W = 3500
-  )
+
+  for (repeat_id in 1:20) {
+
+    greedy_knapsack_original(
+      x = greedy_objects,
+      W = 3500
+    )
+  }
+
 })
 ```
 
 ## Optimization
 
-The weight and value columns were extracted before the loop:
+The optimized package implementation extracts the weight and value columns
+before the loop:
 
 ```r
 weights <- x$w
 values <- x$v
 ```
 
-The current weight was cached:
+The current weight is cached:
 
 ```r
 item_weight <- weights[i]
 ```
 
-The output vector was also preallocated:
+The output vector is preallocated:
 
 ```r
-elements <- integer(
-  nrow(x)
-)
-
+elements <- integer(nrow(x))
 count <- 0L
 ```
 
-Selected indices were written directly into the preallocated vector:
+Selected indices are written directly into the preallocated vector:
 
 ```r
 count <- count + 1L
 elements[count] <- i
 ```
 
-At the end, only the used part of the vector was kept.
+At the end, only the used part of the vector is retained.
 
-The greedy strategy itself did not change. The optimization only reduced
-repeated data access and memory allocation.
+These changes reduce repeated data-frame access and repeated memory allocation.
+The greedy rule itself is the same in both benchmarked implementations: both
+stop at the first object that does not fit.
+
+## Correctness before benchmarking
+
+Before comparing execution time, the two implementations are checked on the
+same input:
+
+```{r greedy-correctness}
+greedy_original_result <- greedy_knapsack_original(
+  greedy_objects,
+  W = 3500
+)
+
+greedy_optimized_result <- greedy_knapsack(
+  greedy_objects,
+  W = 3500
+)
+
+identical(
+  greedy_original_result,
+  greedy_optimized_result
+)
+```
+
+The comparison must return `TRUE`. This ensures that the timing comparison is
+between two implementations of the same greedy algorithm.
 
 ## Performance before and after optimization
 
-Both versions were measured ten times using the same one-million-object
+Both implementations are measured ten times using the same one-million-object
 dataset.
 
-The results were:
+```{r greedy-benchmark}
+greedy_original_times <- replicate(
+  10,
+  system.time(
+    greedy_knapsack_original(
+      greedy_objects,
+      W = 3500
+    )
+  )[["elapsed"]]
+)
 
-| Measurement | Original | Optimized |
-|---|---:|---:|
-| Mean elapsed time | 0.8856 s | 0.0811 s |
-| Median elapsed time | 0.881 s | 0.081 s |
-| Fastest run | 0.867 s | 0.079 s |
-| Slowest run | 0.926 s | 0.084 s |
+greedy_optimized_times <- replicate(
+  10,
+  system.time(
+    greedy_knapsack(
+      greedy_objects,
+      W = 3500
+    )
+  )[["elapsed"]]
+)
 
-The speedup was:
+greedy_benchmark <- data.frame(
+  Measurement = c(
+    "Mean elapsed time",
+    "Median elapsed time",
+    "Fastest run",
+    "Slowest run"
+  ),
+  Original = c(
+    mean(greedy_original_times),
+    median(greedy_original_times),
+    min(greedy_original_times),
+    max(greedy_original_times)
+  ),
+  Optimized = c(
+    mean(greedy_optimized_times),
+    median(greedy_optimized_times),
+    min(greedy_optimized_times),
+    max(greedy_optimized_times)
+  )
+)
 
-\[
-\text{Speedup}
-=
-\frac{0.8856}{0.0811}
-\approx
-10.92
-\]
+greedy_benchmark
+```
 
-The optimized version was therefore approximately **10.92 times faster on
-average**.
+The measured mean times are therefore:
 
-The reduction in mean elapsed time was:
+- original implementation:
+  `r round(mean(greedy_original_times), 4)` seconds,
+- optimized implementation:
+  `r round(mean(greedy_optimized_times), 4)` seconds.
 
-\[
-\frac{0.8856 - 0.0811}{0.8856}
-\times 100
-\approx
-90.84\%
-\]
+The mean-based speedup is:
 
-So the mean execution time was reduced by approximately **90.84%**.
+```{r greedy-speedup}
+greedy_speedup <-
+  mean(greedy_original_times) /
+  mean(greedy_optimized_times)
+
+greedy_reduction <-
+  (
+    mean(greedy_original_times) -
+      mean(greedy_optimized_times)
+  ) /
+  mean(greedy_original_times) *
+  100
+
+greedy_speedup
+greedy_reduction
+```
+
+In this benchmark, the optimized implementation is approximately
+**`r round(greedy_speedup, 2)` times faster** on average, corresponding to an
+elapsed-time reduction of approximately **`r round(greedy_reduction, 2)`%**.
+
+Because execution time depends on hardware and system load, the exact values
+may differ between machines. The important comparison is that both versions are
+measured in the same R session using identical data and the same greedy rule.
 
 ## Profiling after optimization
 
-Because one optimized execution is very short, the function was repeated
-twenty times while profiling:
+The optimized implementation can be profiled with:
 
 ```{r greedy-optimized-profile, eval=FALSE}
 profvis::profvis({
@@ -946,44 +1085,15 @@ profvis::profvis({
 })
 ```
 
-The remaining execution time was mainly associated with:
+The remaining execution time is mainly associated with:
 
 - sorting using `order()`,
-- the capacity check,
-- retrieving weights,
-- iterating through the sorted indices.
+- checking the capacity,
+- retrieving values from the cached vectors,
+- iterating over the sorted indices until the first item does not fit.
 
-This is expected because sorting is also the dominant operation in the
-theoretical complexity.
-
-## Correctness and complexity after optimization
-
-The original and optimized greedy implementations were compared on identical
-input data.
-
-```{r greedy-correctness, eval=FALSE}
-identical(
-  greedy_knapsack_original(
-    greedy_objects,
-    W = 3500
-  ),
-  greedy_knapsack(
-    greedy_objects,
-    W = 3500
-  )
-)
-```
-
-The result was:
-
-```text
-[1] TRUE
-```
-
-The optimized implementation therefore preserved the behaviour of the original
-implementation for the benchmark data.
-
-Its complexity remains:
+Sorting remains the dominant asymptotic operation, so the theoretical
+complexity remains:
 
 \[
 O(n \log n)
@@ -998,7 +1108,7 @@ different trade-offs.
 |---|---|---|---:|---|---:|
 | Brute force | Yes | \(O(2^n)\) | `n = 16` | Bit masks and cached vectors | 4.70x |
 | Dynamic programming | Yes | \(O(nW)\) | `n = 500` | Vectorized capacity calculations | 1.86x |
-| Greedy | No | \(O(n \log n)\) | `n = 1,000,000` | Cached vectors and preallocated output | 10.92x |
+| Greedy | No | \(O(n \log n)\) | `n = 1,000,000` | Cached vectors and preallocated output | `r paste0(round(greedy_speedup, 2), "x")` |
 
 Brute force guarantees the optimum, but its exponential growth limits it to
 small inputs.
@@ -1022,15 +1132,17 @@ Correctness was checked throughout the implementation and optimization work.
 The provided test suites were used for the brute force and greedy functions,
 and additional tests were written for the dynamic programming implementation.
 
-After the optimizations, the complete test suite was run again.
+After the corrections and optimizations, the complete test suite was run again. The official course test suites for brute force and greedy are included, together with our own tests for dynamic programming.
 
-The package was also checked using:
+At the current stage the test suite contains 46 passing tests with no failures, warnings, or skips.
+
+The package should also be checked using:
 
 ```r
 devtools::check()
 ```
 
-The final package check completed with:
+Before submission, `devtools::check()` must complete with:
 
 ```text
 0 errors
@@ -1038,8 +1150,7 @@ The final package check completed with:
 0 notes
 ```
 
-This confirms that the performance changes did not introduce package-level
-errors, warnings, or notes.
+This check must be rerun after the final vignette and code changes.
 
 # Starred exercise: profiling and improving the API package
 

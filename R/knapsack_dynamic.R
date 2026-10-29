@@ -12,7 +12,7 @@
 #'   \item{elements}{The row numbers of the selected items.}
 #' }
 #'
-#'#' @examples
+#' @examples
 #' x <- data.frame(
 #'   w = c(1, 3, 4),
 #'   v = c(1, 4, 5)

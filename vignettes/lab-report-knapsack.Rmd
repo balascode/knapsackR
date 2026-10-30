@@ -1157,7 +1157,7 @@ and additional tests were written for the dynamic programming implementation.
 
 After the corrections and optimizations, the complete test suite was run again. The official course test suites for brute force and greedy are included, together with our own tests for dynamic programming.
 
-At the current stage the test suite contains 46 passing tests with no failures, warnings, or skips.
+The complete test suite passes with no failures, warnings, or skipped tests.
 
 The final package check was run using:
 
